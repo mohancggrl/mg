@@ -1,0 +1,56 @@
+---
+- name: Set date fact
+  set_fact:
+    current_date: "{{ ansible_date_time.date }}-{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}-{{ ansible_date_time.second }}"
+
+- name: Backup existing install of Wildfly
+  command: /bin/mv {{InstallPath}} {{InstallPath}}.{{ current_date }}
+  when: wildfly_directory.stat.exists and wildfly_directory.stat.isdir
+
+- name: Create temp directory
+  file:
+    path: "{{TempDir}}"
+    mode: 0755
+    state: directory
+
+- name: Download Wildfly {{ WildflyVersion }}
+  get_url:
+    url: "{{ url }}/{{ WildflyVersion }}/wildfly-{{ WildflyVersion }}.zip"
+    dest: "{{TempDir}}/wildfly-{{ WildflyVersion }}.zip"
+
+- name: Create installation directory
+  file:
+    path: "{{InstallPath}}.new"
+    mode: 0755
+    state: directory
+
+- name: Extract Wildfly {{ WildflyVersion }} archive
+  unarchive:
+    dest: "{{InstallPath}}.new/"
+    src: "{{TempDir}}/wildfly-{{ WildflyVersion }}.zip"
+    copy: false
+
+- name: Move new version into installation path
+  command: "/bin/mv {{InstallPath}}.new/wildfly-{{ WildflyVersion }} {{InstallPath}}"
+
+- block:
+    - name: Restore old configuration files
+      command: "/bin/cp -R --backup {{InstallPath}}.{{ current_date }}/{{item}}/configuration {{InstallPath}}/{{item}}/"
+      loop:
+        - appclient
+        - domain
+        - standalone
+
+    - name: Restore old deployments
+      command: "/bin/cp -R --backup {{InstallPath}}.{{ current_date }}/standalone/deployments {{InstallPath}}/standalone/"
+
+    - name: Test whether new Wildfly works
+      command: "{{InstallPath}}/bin/standalone.sh --version"
+      changed_when: false
+      register: restored_wildfly_test
+      ignore_errors: true
+
+    - name: Wildfly works?
+      assert:
+        that: "restored_wildfly_test.rc == 0 or ('MaxPermSize=256m; support was removed' in restored_wildfly_test.stderr and restored_wildfly_test.rc == 1)"
+  when: wildfly_directory.stat.exists and wildfly_directory.stat.isdir

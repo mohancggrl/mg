@@ -1,0 +1,83 @@
+---
+- name: Check for existing Wildfly
+  stat:
+    path: "{{InstallPath}}"
+  register: wildfly_directory
+
+- name: Test whether Wildfly works
+  command:
+    "{{InstallPath}}/bin/standalone.sh --version"
+  register: wildfly_test
+  ignore_errors: true
+  failed_when: false
+  changed_when: false
+  when: wildfly_directory.stat.exists and wildfly_directory.stat.isdir
+
+- name: Download Wildfly Package from Wildfly.org and extract the archive
+  include_tasks: wildfly_package.yml
+  when: not (wildfly_directory.stat.exists and wildfly_directory.stat.isdir) or (wildfly_test.rc != 0 and not ('MaxPermSize=256m; support was removed' in wildfly_test.stderr and wildfly_test.rc == 1))
+
+- name: Add group UserGroup
+  group:
+    name: "{{UserGroup | default(wildfly)}}"
+
+- name: Add user UserName
+  user:
+    name: "{{UserName | default('wildfly')}}"
+    group: "{{UserGroup | default(wildfly)}}"
+    home: "{{InstallPath}}"
+    state: present
+
+- name: Change ownership of Wildfly installation
+  file:
+    path: "{{InstallPath}}"
+    owner: "{{UserName | default('wildfly')}}"
+    group: "{{UserGroup | default('wildfly')}}"
+    state: directory
+    recurse: true
+
+- name: Reload daemon
+  systemd:
+    daemon_reload: true
+
+- name: Copy the systemd service
+  template:
+    src: wildfly.service
+    dest: /etc/systemd/system/wildfly.service
+    mode: 0755
+  register: service_file
+
+- name: Reload daemon
+  systemd:
+    daemon_reload: true
+
+- name: Enable Wildfly to be started at boot
+  systemd:
+    name: wildfly.service
+    enabled: true
+    state: stopped
+  when: service_file.changed
+  notify:
+    - daemon reload
+
+- name: Start Wildfly
+  systemd:
+    name: wildfly.service
+    state: started
+
+- name: Change ownership of Wildfly installation
+  file:
+    path: "{{InstallPath}}"
+    owner: "{{UserName | default('wildfly')}}"
+    group: "{{UserGroup | default('wildfly')}}"
+    state: directory
+    recurse: true
+    
+- name: Create JMX User
+  Command: {{InstallPath}}/bin/add-user.sh -u {{JMX_USERNAME}} -g {{JMX_GROUP}} -p {{JMX_PASSWORD}}
+  
+- name: Create Heap dump directory
+  file:
+   path: {{HEAP_DUMP_DIRECTORY}}
+   mode: 0755
+   state: directory

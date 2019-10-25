@@ -1,0 +1,21 @@
+[Unit]
+Description=Wildfly Service
+After=syslog.target network-online.target
+
+[Service]
+User={{UserName | default('wildfly')}}
+Group={{UserGroup | default('UserName')}}
+WorkingDirectory={{InstallPath}}
+{% if Domain %}
+ExecStart={{InstallPath}}/bin/domain.sh {{ Domine_StartOptions }}
+{% else %}
+ExecStart={{InstallPath}}/bin/standalone.sh {{ standalone_StartOptions }}
+{% endif %}
+Restart=always
+KillSignal=SIGQUIT
+Type=simple
+StandardError=syslog
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target
