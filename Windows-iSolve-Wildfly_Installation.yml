@@ -1,0 +1,37 @@
+#=============================================================================
+#
+# Windows-iSolve-Wildfly_Installation.yml
+#
+# 2019-10-14 1.0.0 Mohan G. <mg86@dxc.com>
+#  - Playbook Creation
+#  - Visual Basic Script WINDOWS-RBA-Service_subflow-846.vbs
+#
+#=============================================================================
+# Parameters:
+# NODE - Target inventory node
+
+# ---
+# SLAM_TASKNAME: Windows iSolve Wildfly Installation
+# SLAM_FACT_SYSTEM: CentOS, Linux, Redhat
+# SLAM_Q: Play
+# SLAM_DESCRIPTION: This script starts Windows services that are currently stopped.
+# SLAM_FF_WildflyVersion:
+#   type: Text
+#   required: true
+#   ghost: eg. 15.0.1.Final
+#   prompt: Enter Wildfly version
+# SLAM_FF_Service_Name:
+#   type: Text
+#   required: true
+#   ghost: eg. servicename1,servicename2,servicenameN
+#   prompt: Enter the Service Name
+# ---
+---
+- hosts: localhost
+  become: true
+  become_method: sudo
+
+  gather_facts: yes
+
+  roles:
+     - wildfly Installation

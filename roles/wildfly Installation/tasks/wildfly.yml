@@ -13,18 +13,18 @@
   changed_when: false
   when: wildfly_directory.stat.exists and wildfly_directory.stat.isdir
 
-- name: Download Wildfly Package from Wildfly.org and extract the archive
+- name: Download Wildfly from Wildfly.org and extract the archive
   include_tasks: wildfly_package.yml
   when: not (wildfly_directory.stat.exists and wildfly_directory.stat.isdir) or (wildfly_test.rc != 0 and not ('MaxPermSize=256m; support was removed' in wildfly_test.stderr and wildfly_test.rc == 1))
 
-- name: Add group UserGroup
+- name: Add User Grop
   group:
-    name: "{{UserGroup | default(wildfly)}}"
+    name: "{{UserGroup | default('wildfly')}}"
 
-- name: Add user UserName
+- name: Add user Name
   user:
     name: "{{UserName | default('wildfly')}}"
-    group: "{{UserGroup | default(wildfly)}}"
+    group: "{{UserGroup | default('wildfly')}}"
     home: "{{InstallPath}}"
     state: present
 
@@ -35,35 +35,60 @@
     group: "{{UserGroup | default('wildfly')}}"
     state: directory
     recurse: true
+    
+- block:
+    - name: Reload daemon
+      systemd:
+        daemon_reload: true
 
-- name: Reload daemon
-  systemd:
-    daemon_reload: true
+    - name: Copy the systemd service
+      template:
+        src: wildfly.service_redhat7
+        dest: /etc/systemd/system/{{ServiceName}}.service
+        mode: 0755
+      register: service_file
 
-- name: Copy the systemd service
-  template:
-    src: wildfly.service
-    dest: /etc/systemd/system/wildfly.service
-    mode: 0755
-  register: service_file
+    - name: Reload daemon
+      systemd:
+        daemon_reload: true
 
-- name: Reload daemon
-  systemd:
-    daemon_reload: true
+    - name: Enable Wildfly to be started at boot
+      systemd:
+        name: {{ServiceName}}.service
+        enabled: true
+        state: stopped
+      when: service_file.changed
+      notify:
+        - daemon reload
 
-- name: Enable Wildfly to be started at boot
-  systemd:
-    name: wildfly.service
-    enabled: true
-    state: stopped
-  when: service_file.changed
-  notify:
-    - daemon reload
-
-- name: Start Wildfly
-  systemd:
-    name: wildfly.service
-    state: started
+    - name: Start Wildfly
+      systemd:
+        name: {{ServiceName}}.service
+        state: started
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == '7' or ansible_distribution == "RedHat" and ansible_distribution_major_version == '7'
+  
+- block:
+    - name: Copy the start/stop file
+      template:
+        src: wildfly.service_redhat6
+        dest: /etc/init.d/{{ServiceName}}
+        mode: 0755
+      register: service_file
+      
+    - name: Enable Wildfly to be started at boot
+      service:
+        name: "{{ServiceName}}"
+        enabled: true
+        state: stopped
+      when: service_file.changed
+      notify:
+        - restart wildfly
+        
+    - name: Start Wildfly
+      service:
+        name: "{{ServiceName}}"
+        state: started
+  when: ansible_distribution == "CentOS" and ansible_distribution_major_version == '6' or ansible_distribution == "RedHat" and ansible_distribution_major_version == '6'
 
 - name: Change ownership of Wildfly installation
   file:
@@ -72,12 +97,6 @@
     group: "{{UserGroup | default('wildfly')}}"
     state: directory
     recurse: true
-    
+ 
 - name: Create JMX User
   Command: {{InstallPath}}/bin/add-user.sh -u {{JMX_USERNAME}} -g {{JMX_GROUP}} -p {{JMX_PASSWORD}}
-  
-- name: Create Heap dump directory
-  file:
-   path: {{HEAP_DUMP_DIRECTORY}}
-   mode: 0755
-   state: directory

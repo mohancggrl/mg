@@ -1,9 +1,0 @@
----
-- hosts: localhost
-  become true
-  become_method: sudo
-
-  gather_facts: yes
-
-  roles:
-     - wildfly Installation

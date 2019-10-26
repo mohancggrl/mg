@@ -7,9 +7,9 @@ User={{UserName | default('wildfly')}}
 Group={{UserGroup | default('UserName')}}
 WorkingDirectory={{InstallPath}}
 {% if Domain %}
-ExecStart={{InstallPath}}/bin/domain.sh {{ Domine_StartOptions }}
+ExecStart={{InstallPath}}/bin/domain.sh {{ StartOptions }}
 {% else %}
-ExecStart={{InstallPath}}/bin/standalone.sh {{ standalone_StartOptions }}
+ExecStart={{InstallPath}}/bin/standalone.sh {{ StartOptions }}
 {% endif %}
 Restart=always
 KillSignal=SIGQUIT

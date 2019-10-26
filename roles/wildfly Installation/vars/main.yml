@@ -1,7 +1,4 @@
 ---
-InstallPath: /opt/wildfly
+InstallPath: /opt/{{ServiceName}}
 url: https://download.jboss.org/wildfly/
-WildflyVersion: 15.0.1.Final
 TempDir: /tmp/
-JAVA_HOME: /var/apphome/java/jre-1.8.0/jre/
-jre_path: /usr/lib/jvm/jre
